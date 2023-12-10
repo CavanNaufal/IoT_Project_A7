@@ -103,7 +103,7 @@ String CalculateIAQ(float score)
 This function returns a string message to notify the user the current Indoor Air Quality condition. This is based on the BME680 sensor module datasheet as shown below.
 
 
-<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/6828d5aa-9948-4f37-88a0-0fa9741eb1a1" width=80% height=100%>
+<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/6828d5aa-9948-4f37-88a0-0fa9741eb1a1" width=50% height=100%>
 
 
 ## Test Results and Performance Evaluation
@@ -113,9 +113,9 @@ The LED and buzzer will activate under certain conditions. Finally, on the Blynk
 
 The results from the three tests conducted on the original circuit using the Blynk platform all aligned with the established expectations and predefined criteria. Throughout these tests, the entire system's functions and responses were directly evaluated to ensure the circuit operated optimally and seamlessly integrated with Blynk in real-time. eyond this, the system also includes LED indicators that illuminate according to the IAQ conditions and a buzzer designed to sound an alert when the indoor air quality deteriorates
 
-<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/468001ea-ffb8-4f88-bbeb-255a8e2ebd1d" width=100% height=50%>
+<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/468001ea-ffb8-4f88-bbeb-255a8e2ebd1d" width=50% height=50%>
 
-<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/d6528b07-00d4-4ac9-a5c3-441233f148bb" width=100% height=50%>
+<img src="https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/d6528b07-00d4-4ac9-a5c3-441233f148bb" width=50% height=50%>
 
 
 ## Conclusion and future work
