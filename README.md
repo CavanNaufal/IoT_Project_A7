@@ -1,5 +1,5 @@
 <p align="center">
-  <p1 style="font-size: 30px"> 🌀 AirQu: Air Quality Monitoring System</p1>
+  <p1 style="font-size: 50px"> 🌀 AirQu: Air Quality Monitoring System</p1>
 </p>
 
 <p align ="center">
