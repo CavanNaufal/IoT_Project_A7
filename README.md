@@ -4,8 +4,8 @@
 
 <p align ="center">
   <a href="#contributors">Contributors</a> •
-  <a href="#introduction">Introduction to the problem and the solution</a> 
-  <a href="#hardware-design-and-implementation-details">Hardware design and implementation details</a> 
+  <a href="#introduction">Introduction to the problem and the solution</a> •
+  <a href="#hardware-design-and-implementation-details">Hardware design and implementation details</a> • 
   <a href="#network-infrastucture">Network infrastructure</a> •
   <a href="#software-implementation-details">Software Implementation Details</a> •
   <a href="#test-results-and-performance-evaluation">Test Results and Performance Evaluation</a> •
@@ -39,6 +39,9 @@ In this project, we're making an air quality monitoring device system using ESP3
 - Jumper cables
 
 ## Network infrastructure
+For this project, we use blynk platform for its IoT integration and portability. It uses Wi-Fi connection to establish link with ESP32 and its functionality with the sensor. 
+
+![schematic](https://github.com/CavanNaufal/IoT_Project_A7/assets/88538229/8006b424-9318-4905-a2bc-b4911c6c46ff)
 
 
 ## Software Implementation Details
