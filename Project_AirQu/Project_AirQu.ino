@@ -6,202 +6,277 @@
 #define BLYNK_AUTH_TOKEN "5jNNupitKZaE88ZcehdYVUQWF_PNHqST"
 
 #include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include "Adafruit_BME680.h"
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <LiquidCrystal_I2C.h>
 #include <Blynk.h>
 #include <BlynkSimpleEsp32.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include "bsec.h"
+#include "pitches.h"
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+Adafruit_BME680 bme;  // I2C
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // I2C address 0x27, 16 columns and 2 rows
 
 char auth[] = BLYNK_AUTH_TOKEN;
-char ssid[] = ""; // Your WiFi credentials.
-char pass[] = "";
+char ssid[] = "BELCAV"; // Your WiFi credentials.
+char pass[] = "211299200403";
 
-Bsec iaqSensor;
-String output;
+#if CONFIG_FREERTOS_UNICORE 
+static const BaseType_t app_cpu = 0; 
+#else 
+static const BaseType_t app_cpu = 1;  
+#endif 
 
-// Set the I2C address LCD module
-#define I2C_ADDR 0x27
+const int buzzerPin = 4;  // Buzzer pin for ESP32
+const int ledPin = 2;  // Replace with your LED pin
+float gas_reference = 250000;   // Typical sensor resistance at good air quality
+float hum_score, gas_score;
+float hum_reference = 40;  // Set your reference humidity here
+int   getgasreference_count = 0;
 
-// Define LCD column and row size
-#define LCD_COLS 20
-#define LCD_ROWS 4
+void beep(int note, int duration) {
+  tone(buzzerPin, note, duration);
+  delay(duration);
+}
 
-// Define your custom I2C pins
-#define SDA_PIN 21  // Replace with your chosen SDA pin
-#define SCL_PIN 22  // Replace with your chosen SCL pin
+void soundBeep() {
+  beep(NOTE_A4, 500);
+  beep(NOTE_A4, 500);    
+  beep(NOTE_A4, 500);
+  beep(NOTE_F4, 350);
+  beep(NOTE_C5, 150);  
+  beep(NOTE_A4, 500);
+  beep(NOTE_F4, 350);
+  beep(NOTE_C5, 150);
+  beep(NOTE_A4, 650);
+ 
+  delay(500);
+ 
+  beep(NOTE_E5, 500);
+  beep(NOTE_E5, 500);
+  beep(NOTE_E5, 500);  
+  beep(NOTE_F5, 350);
+  beep(NOTE_C5, 150);
+  beep(NOTE_GS4, 500);
+  beep(NOTE_F4, 350);
+  beep(NOTE_C5, 150);
+  beep(NOTE_A4, 650);
+ 
+  delay(500);
+ 
+  beep(NOTE_A5, 500);
+  beep(NOTE_A4, 300);
+  beep(NOTE_A4, 150);
+  beep(NOTE_A5, 500);
+  beep(NOTE_GS5, 325);
+  beep(NOTE_G5, 175);
+  beep(NOTE_FS5, 125);
+  beep(NOTE_F5, 125);    
+  beep(NOTE_FS5, 250);
+ 
+  delay(325);
+ 
+  beep(NOTE_AS4, 250);
+  beep(NOTE_DS5, 500);
+  beep(NOTE_D5, 325);  
+  beep(NOTE_CS5, 175);  
+  beep(NOTE_C5, 125);  
+  beep(NOTE_AS4, 125);  
+  beep(NOTE_C5, 250);  
+ 
+  delay(350);
+}
 
-// Create LCD instance
-LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLS, LCD_ROWS);
-
-void checkIaqSensorStatus(void);
-void errLeds(void);
-
-void setup(void)
-{
+void setup() {
   Serial.begin(115200);
-
-  // Initialize LCD with custom I2C pins
-  Wire.begin(SDA_PIN, SCL_PIN);
-  lcd.init();
-  lcd.backlight(); // Enable the backlight
+  Serial.println(F("BME680 test"));
 
   Blynk.begin(auth, ssid, pass);
 
-  iaqSensor.begin(BME680_I2C_ADDR_PRIMARY, Wire);
-  output = "\nBSEC library version " + String(iaqSensor.version.major) + "." + String(iaqSensor.version.minor) + "." + String(iaqSensor.version.major_bugfix) + "." + String(iaqSensor.version.minor_bugfix);
-  Serial.println(output);
-  checkIaqSensorStatus();
+  Wire.begin();
+  if (!bme.begin()) {
+    Serial.println("Could not find a valid BME680 sensor, check wiring!");
+    while (1);
+  }
 
-  bsec_virtual_sensor_t sensorList[10] = 
-  {
-    BSEC_OUTPUT_RAW_TEMPERATURE,
-    BSEC_OUTPUT_RAW_PRESSURE,
-    BSEC_OUTPUT_RAW_HUMIDITY,
-    BSEC_OUTPUT_RAW_GAS,
-    BSEC_OUTPUT_IAQ,
-    BSEC_OUTPUT_STATIC_IAQ,
-    BSEC_OUTPUT_CO2_EQUIVALENT,
-    BSEC_OUTPUT_BREATH_VOC_EQUIVALENT,
-    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE,
-    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY
-  };
+  pinMode(LED_BUILTIN, OUTPUT);  // Initialize the player ON indicator LED
 
-  iaqSensor.updateSubscription(sensorList, 10, BSEC_SAMPLE_RATE_LP);
-  checkIaqSensorStatus();
+  lcd.init();       //initialize the lcd
+  lcd.backlight();  //open the backlight
 
-  // Print the header on LCD
-  lcd.setCursor(0, 0);
-  lcd.print("Timestamp  Temp   Hum");
+  pinMode(buzzerPin, OUTPUT);    // Initialize the buzzer pin
+  pinMode(ledPin, OUTPUT);  // Initialize the LED pin
 
-  lcd.setCursor(0, 1);
-  lcd.print("IAQ   VOC");
+  bme.setTemperatureOversampling(BME680_OS_2X);
+  bme.setHumidityOversampling(BME680_OS_2X);
+  bme.setPressureOversampling(BME680_OS_2X);
+  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
+  bme.setGasHeater(320, 150);
 
-  lcd.setCursor(0, 2);
-  lcd.print("CO2   Pressure");
+  xTaskCreatePinnedToCore( 
+    vBmeTask,     // Function to be called 
+    "BMESensorTask",   // Name of the task 
+    10000,              // Stack size (bytes in ESP32, words in FreeRTOS) 
+    NULL,               // Parameter to pass 
+    1,                  // Task priority 
+    NULL,               // Task handle 
+    app_cpu             // Run on one core for demo purposes (ESP32 only) 
+  );
 
-  lcd.setCursor(0, 3);
-  lcd.print("Blynk Status");
+  // Run the sensor for a burn-in period
+  GetGasReference();
 }
 
-void loop(void)
-{
-  unsigned long time_trigger = millis();
-  if (iaqSensor.run())
-  {
-    output = String(time_trigger);
-    output += ", " + String(iaqSensor.rawTemperature);
-    output += ", " + String(iaqSensor.pressure);
-    output += ", " + String(iaqSensor.rawHumidity);
-    output += ", " + String(iaqSensor.gasResistance);
-    output += ", " + String(iaqSensor.iaq);
-    output += ", " + String(iaqSensor.iaqAccuracy);
-    output += ", " + String(iaqSensor.temperature);
-    output += ", " + String(iaqSensor.humidity);
-    output += ", " + String(iaqSensor.staticIaq);
-    output += ", " + String(iaqSensor.co2Equivalent);
-    output += ", " + String(iaqSensor.breathVocEquivalent);
-    Serial.println(output);
+void vBmeTask(void *parameter){
+  while(1){
+    unsigned long endTime = bme.beginReading();
+    if (endTime == 0) {
+      Serial.println(F("Failed to begin reading :("));
+      return;
+    }
 
-    Serial.print("Pressure: ");
-    Serial.print((iaqSensor.pressure) / 1000);
-    Serial.println(" hPa");
+    delay(50);  // This represents parallel work.
+    
+    if (!bme.endReading()) {
+      Serial.println(F("Failed to complete reading :("));
+      return;
+    }
 
-    Serial.print("Temperature: ");
-    Serial.print(iaqSensor.temperature);
-    Serial.println(" *C");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    Serial.print(F("\n\n\nTemperature = "));
+    Serial.print(bme.temperature);
+    Serial.println(F(" *C"));
+    lcd.print("Temp: ");
+    lcd.print(bme.temperature);
+    lcd.print(" *C");
+    Blynk.virtualWrite(V0, bme.temperature);
 
-    Serial.print("Humidity: ");
-    Serial.print(iaqSensor.humidity);
-    Serial.println(" %");
+    lcd.setCursor(0, 1);
+    Serial.print(F("Pressure = "));
+    Serial.print(bme.pressure / 100.0);
+    Serial.println(F(" hPa"));
+    lcd.print("Pres: ");
+    lcd.print(bme.pressure / 100.0);
+    lcd.print(" hPa");
+    Blynk.virtualWrite(V3, bme.pressure / 100.0);
+    delay(5000);
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    Serial.print(F("Humidity = "));
+    Serial.print(bme.humidity);
+    Serial.println(F(" %"));
+    lcd.print("Humidity: ");
+    lcd.print(bme.humidity);
+    lcd.print(" %");
+    Blynk.virtualWrite(V1, bme.humidity);
 
-    Serial.print("IAQ: ");
-    Serial.print(iaqSensor.iaq);
-    Serial.println(" PPM");
+    lcd.setCursor(0, 1);
+    Serial.print(F("Gas = "));
+    Serial.print(bme.gas_resistance / 1000.0);
+    Serial.println(F(" KOhms"));
+    lcd.print("Gas: ");
+    lcd.print(bme.gas_resistance / 1000.0);
+    lcd.print(" KOhms");
+    Blynk.virtualWrite(V4, bme.gas_resistance / 1000.0);
+    delay(5000);
+    
 
-    Serial.print("CO2 Equivalent: ");
-    Serial.print(iaqSensor.co2Equivalent);
-    Serial.println(" PPM");
+    float hum_score, gas_score;
+    float hum_reference = 40;  // Set your reference humidity here
+    int   getgasreference_count = 0;
+    float air_quality_score;
 
-    Serial.print("Breath VOC Equivalent: ");
-    Serial.print(iaqSensor.breathVocEquivalent);
-    Serial.println(" PPM");
-    Serial.println();
+    // Calculate humidity contribution to IAQ index
+    float current_humidity = bme.humidity;
+    if (current_humidity >= 38 && current_humidity <= 42)
+      hum_score = 0.25 * 100;  // Humidity +/-5% around optimum
+    else {
+      // sub-optimal
+      if (current_humidity < 38)
+        hum_score = 0.25 / hum_reference * current_humidity * 100;
+      else
+        hum_score = ((-0.25 / (100 - hum_reference) * current_humidity) + 0.416666) * 100;
+    }
 
-    // Display information on the LCD
-    lcd.setCursor(7, 0);
-    lcd.print(iaqSensor.temperature);
-    lcd.print("C ");
-    lcd.print(iaqSensor.humidity);
-    lcd.print("%");
+    // Calculate gas contribution to IAQ index
+    float gas_lower_limit = 5000;   // Bad air quality limit
+    float gas_upper_limit = 50000;  // Good air quality limit
+    if (bme.gas_resistance < gas_lower_limit) gas_reference = gas_lower_limit;
+    if (bme.gas_resistance > gas_upper_limit) gas_reference = gas_upper_limit;
+    gas_score = (0.75 / (gas_upper_limit - gas_lower_limit) * gas_reference -
+                 (gas_lower_limit * (0.75 / (gas_upper_limit - gas_lower_limit)))) *
+                100;
 
-    lcd.setCursor(4, 1);
-    lcd.print(iaqSensor.iaq);
-    lcd.setCursor(11, 1);
-    lcd.print(iaqSensor.breathVocEquivalent);
+    // Combine results for the final IAQ index value (0-100% where 100% is good quality air)
+    air_quality_score = hum_score + gas_score;
 
-    lcd.setCursor(4, 2);
-    lcd.print(iaqSensor.co2Equivalent);
-    lcd.setCursor(12, 2);
-    lcd.print((iaqSensor.pressure) / 1000);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    Serial.print(F("IAQ Score = "));
+    Serial.println(String(air_quality_score, 1));
+    lcd.print("IAQ Score : ");
+    lcd.print(air_quality_score);
 
-    lcd.setCursor(13, 3);
-    lcd.print(Blynk.connected() ? "Online" : "Offline");
+    if (bme.readGas() < 120000) {
+      Serial.println("***** Poor Air Quality *****");
+      digitalWrite(ledPin, HIGH);
+      soundBeep();
+    } else {
+      digitalWrite(ledPin, LOW);
+    }
 
-    Blynk.run();
-    Blynk.virtualWrite(V1, (iaqSensor.pressure) / 1000);
-    Blynk.virtualWrite(V2, iaqSensor.temperature);
-    Blynk.virtualWrite(V3, iaqSensor.humidity);
-    Blynk.virtualWrite(V4, iaqSensor.iaq);
-    Blynk.virtualWrite(V5, iaqSensor.co2Equivalent);
-    Blynk.virtualWrite(V6, iaqSensor.breathVocEquivalent);
-  }
-  else
-  {
-    checkIaqSensorStatus();
+    delay(2000);
+
+    if((getgasreference_count++)%10==0) GetGasReference();  // Get new gas reference value after 10 minutes
+
+    String iaqText = CalculateIAQ(air_quality_score);
+    Serial.print(F("IAQ Text = "));
+    Serial.println(iaqText);
+    Blynk.virtualWrite(V2, iaqText);
+
+    Serial.print(F("Approx. Altitude = "));
+    Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+    Serial.println(F(" m"));
   }
 }
 
-void checkIaqSensorStatus(void)
-{
-  if (iaqSensor.status != BSEC_OK)
-  {
-    if (iaqSensor.status < BSEC_OK)
-    {
-      output = "BSEC error code : " + String(iaqSensor.status);
-      Serial.println(output);
-      for (;;)
-        errLeds(); /* Halt in case of failure */
-    }
-    else
-    {
-      output = "BSEC warning code : " + String(iaqSensor.status);
-      Serial.println(output);
-    }
+void GetGasReference(){
+  // Now run the sensor for a burn-in period, then use combination of relative humidity and gas resistance to estimate indoor air quality as a percentage.
+  Serial.println("Getting a new gas reference value");
+  int readings = 10;
+  for (int i = 1; i <= readings; i++){ // read gas for 10 x 0.150mS = 1.5secs
+    gas_reference += bme.gas_resistance;
   }
+  gas_reference = gas_reference / readings;
+} 
 
-  if (iaqSensor.bme680Status != BME680_OK)
-  {
-    if (iaqSensor.bme680Status < BME680_OK)
-    {
-      output = "BME680 error code : " + String(iaqSensor.bme680Status);
-      Serial.println(output);
-      for (;;)
-        errLeds(); /* Halt in case of failure */
-    }
-    else
-    {
-      output = "BME680 warning code : " + String(iaqSensor.bme680Status);
-      Serial.println(output);
-    }
-  }
+void loop() {
+  Blynk.run();
 }
 
-void errLeds(void)
-{
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(100);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(100);
+String CalculateIAQ(float score) {
+  String IAQ_text = "Air Quality is ";
+  score = (100 - score) * 5;
+  if (score >= 301)
+    IAQ_text += "Very Bad";
+  else if (score >= 201 && score <= 300)
+    IAQ_text += "Worse";
+  else if (score >= 151 && score <= 200)
+    IAQ_text += "Bad";
+  else if (score >= 101 && score <= 150)
+    IAQ_text += "Little Bad";
+  else if (score >= 51 && score <= 100)
+    IAQ_text += "Average";
+  else if (score >= 0 && score <= 50)
+    IAQ_text += "Good";
+  return IAQ_text;
 }
