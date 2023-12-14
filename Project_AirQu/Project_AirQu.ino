@@ -25,8 +25,8 @@ Adafruit_BME680 bme;  // I2C
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // I2C address 0x27, 16 columns and 2 rows
 
 char auth[] = BLYNK_AUTH_TOKEN;
-char ssid[] = "BELCAV"; // Your WiFi credentials.
-char pass[] = "211299200403";
+char ssid[] = "SAMSUNGS21"; // Your WiFi credentials.
+char pass[] = "12345678";
 
 #if CONFIG_FREERTOS_UNICORE 
 static const BaseType_t app_cpu = 0; 
@@ -34,65 +34,65 @@ static const BaseType_t app_cpu = 0;
 static const BaseType_t app_cpu = 1;  
 #endif 
 
-const int buzzerPin = 4;  // Buzzer pin for ESP32
+const int buzzerPin = 5;  // Buzzer pin for ESP32
 const int ledPin = 2;  // Replace with your LED pin
 float gas_reference = 250000;   // Typical sensor resistance at good air quality
 float hum_score, gas_score;
 float hum_reference = 40;  // Set your reference humidity here
 int   getgasreference_count = 0;
 
-void beep(int note, int duration) {
-  tone(buzzerPin, note, duration);
-  delay(duration);
-}
+// void beep(int note, int duration) {
+//   tone(buzzerPin, note, duration);
+//   delay(duration);
+// }
 
-void soundBeep() {
-  beep(NOTE_A4, 500);
-  beep(NOTE_A4, 500);    
-  beep(NOTE_A4, 500);
-  beep(NOTE_F4, 350);
-  beep(NOTE_C5, 150);  
-  beep(NOTE_A4, 500);
-  beep(NOTE_F4, 350);
-  beep(NOTE_C5, 150);
-  beep(NOTE_A4, 650);
+// void soundBeep() {
+//   beep(NOTE_A4, 500);
+//   beep(NOTE_A4, 500);    
+//   beep(NOTE_A4, 500);
+//   beep(NOTE_F4, 350);
+//   beep(NOTE_C5, 150);  
+//   beep(NOTE_A4, 500);
+//   beep(NOTE_F4, 350);
+//   beep(NOTE_C5, 150);
+//   beep(NOTE_A4, 650);
  
-  delay(500);
+//   delay(500);
  
-  beep(NOTE_E5, 500);
-  beep(NOTE_E5, 500);
-  beep(NOTE_E5, 500);  
-  beep(NOTE_F5, 350);
-  beep(NOTE_C5, 150);
-  beep(NOTE_GS4, 500);
-  beep(NOTE_F4, 350);
-  beep(NOTE_C5, 150);
-  beep(NOTE_A4, 650);
+//   beep(NOTE_E5, 500);
+//   beep(NOTE_E5, 500);
+//   beep(NOTE_E5, 500);  
+//   beep(NOTE_F5, 350);
+//   beep(NOTE_C5, 150);
+//   beep(NOTE_GS4, 500);
+//   beep(NOTE_F4, 350);
+//   beep(NOTE_C5, 150);
+//   beep(NOTE_A4, 650);
  
-  delay(500);
+//   delay(500);
  
-  beep(NOTE_A5, 500);
-  beep(NOTE_A4, 300);
-  beep(NOTE_A4, 150);
-  beep(NOTE_A5, 500);
-  beep(NOTE_GS5, 325);
-  beep(NOTE_G5, 175);
-  beep(NOTE_FS5, 125);
-  beep(NOTE_F5, 125);    
-  beep(NOTE_FS5, 250);
+//   beep(NOTE_A5, 500);
+//   beep(NOTE_A4, 300);
+//   beep(NOTE_A4, 150);
+//   beep(NOTE_A5, 500);
+//   beep(NOTE_GS5, 325);
+//   beep(NOTE_G5, 175);
+//   beep(NOTE_FS5, 125);
+//   beep(NOTE_F5, 125);    
+//   beep(NOTE_FS5, 250);
  
-  delay(325);
+//   delay(325);
  
-  beep(NOTE_AS4, 250);
-  beep(NOTE_DS5, 500);
-  beep(NOTE_D5, 325);  
-  beep(NOTE_CS5, 175);  
-  beep(NOTE_C5, 125);  
-  beep(NOTE_AS4, 125);  
-  beep(NOTE_C5, 250);  
+//   beep(NOTE_AS4, 250);
+//   beep(NOTE_DS5, 500);
+//   beep(NOTE_D5, 325);  
+//   beep(NOTE_CS5, 175);  
+//   beep(NOTE_C5, 125);  
+//   beep(NOTE_AS4, 125);  
+//   beep(NOTE_C5, 250);  
  
-  delay(350);
-}
+//   delay(350);
+// }
 
 void setup() {
   Serial.begin(115200);
@@ -229,9 +229,11 @@ void vBmeTask(void *parameter){
     if (bme.readGas() < 120000) {
       Serial.println("***** Poor Air Quality *****");
       digitalWrite(ledPin, HIGH);
-      soundBeep();
+      digitalWrite(buzzerPin, HIGH);
+      // soundBeep();
     } else {
       digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
     }
 
     delay(2000);
